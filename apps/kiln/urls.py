@@ -5,6 +5,7 @@ from . import views
 urlpatterns = [
     path("", views.home, name="home"),
     path("floor/grid/", views.floor_grid_partial, name="floor_grid"),
+    path("floor/legend/", views.floor_legend_partial, name="floor_legend"),
     path("hearth/<int:pk>/drawer/", views.hearth_drawer, name="hearth_drawer"),
     path("hearth/<int:pk>/phase/", views.change_phase, name="change_phase"),
     path("hearth/<int:pk>/probe/", views.add_probe, name="add_probe"),

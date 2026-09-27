@@ -10,20 +10,8 @@ from django.views.decorators.http import require_http_methods, require_POST
 
 from .forms import OpenCookRunForm, PhaseChangeForm, ResinLotForm, SoftPointProbeForm
 from .models import CookRun, FireHearth, ResinLot
-from .services.floor_rules import change_hearth_phase
-
-PHASE_FILTER_ALIASES = {
-    "cold": "cold",
-    "charging": "charging",
-    "ramping": "ramping",
-    "holding": "holding",
-    "drawing": "holding",
-    "出胶": "holding",
-    "保温": "holding",
-    "升温": "ramping",
-    "装料": "charging",
-    "冷灶": "cold",
-}
+from .services.board import board_view
+from .services.floor_rules import DRAWING_SOFT_POINT_MAX, change_hearth_phase
 
 
 def _wants_htmx(request):
@@ -42,39 +30,11 @@ def _hearths_for_board():
     ).order_by("lane", "tag")
 
 
-def _legend_counts(hearths):
-    counts = {key: 0 for key, _ in FireHearth.PHASE_CHOICES}
-    for h in hearths:
-        if h.phase == FireHearth.PHASE_DRAWING:
-            counts[FireHearth.PHASE_HOLDING] += 1
-        elif h.phase in counts:
-            counts[h.phase] += 1
-    return [
-        (key, label, counts.get(key, 0))
-        for key, label in FireHearth.PHASE_CHOICES
-    ]
-
-
-def _apply_phase_filter(hearths, phase_raw):
-    if not phase_raw:
-        return hearths
-    mapped = PHASE_FILTER_ALIASES.get(phase_raw, phase_raw)
-    return [h for h in hearths if h.phase == mapped]
-
-
-def _board_context(phase_filter=None, apply_filter=True):
-    hearths = list(_hearths_for_board())
-    legend = _legend_counts(hearths)
-    visible = _apply_phase_filter(hearths, phase_filter) if apply_filter else hearths
-    lanes = {}
-    for h in visible:
-        lanes.setdefault(h.lane, []).append(h)
-    return {
-        "hearths": visible,
-        "lanes": sorted(lanes.items()),
-        "phase_legend": legend,
-        "phase_filter": phase_filter or "",
-    }
+def _board_context(phase_filter=""):
+    """图例计数与网格瓦片同源：board_view 内一次聚合同时产出两者。"""
+    ctx = board_view(list(_hearths_for_board()), phase_filter)
+    ctx["drawing_soft_point_max"] = DRAWING_SOFT_POINT_MAX
+    return ctx
 
 
 def _drawer_context(hearth):
@@ -89,13 +49,14 @@ def _drawer_context(hearth):
         "phase_form": PhaseChangeForm(hearth=hearth),
         "probe_form": SoftPointProbeForm() if open_run else None,
         "open_run_form": OpenCookRunForm(hearth=hearth) if open_run is None else None,
+        "drawing_soft_point_max": DRAWING_SOFT_POINT_MAX,
     }
 
 
 @login_required
 def home(request):
     phase_filter = request.GET.get("phase", "").strip()
-    ctx = _board_context(phase_filter=phase_filter, apply_filter=True)
+    ctx = _board_context(phase_filter=phase_filter)
     drawer_pk = request.GET.get("hearth")
     if drawer_pk:
         try:
@@ -111,10 +72,20 @@ def home(request):
 
 @login_required
 def floor_grid_partial(request):
+    # 与整页筛选走同一个 board_view：以前这里 apply_filter=False，
+    # floor-refresh 后局部网格会丢掉筛选、各算各的。
     phase_filter = request.GET.get("phase", "").strip()
-    ctx = _board_context(phase_filter=phase_filter, apply_filter=False)
+    ctx = _board_context(phase_filter=phase_filter)
     html = render_to_string("floor/_grid.html", ctx, request=request)
     return HttpResponse(html)
+
+
+@login_required
+def floor_legend_partial(request):
+    """改相位后图例随 floor-refresh 一起重拉，杜绝偶发不刷。"""
+    phase_filter = request.GET.get("phase", "").strip()
+    ctx = _board_context(phase_filter=phase_filter)
+    return render(request, "floor/_legend.html", ctx)
 
 
 @login_required
