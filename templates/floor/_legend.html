@@ -1,0 +1,8 @@
+<div class="phase-legend" id="phase-legend"{% if legend_oob %} hx-swap-oob="true"{% endif %}>
+  {% for key, label, count in phase_legend %}
+  <a class="leg phase-{{ key }}{% if phase_filter == key %} on{% endif %}" href="?phase={{ key }}"><i></i>{{ label }} {{ count }}</a>
+  {% endfor %}
+  {% if phase_filter %}
+  <a class="leg clear" href="{% url 'home' %}">清除筛选</a>
+  {% endif %}
+</div>

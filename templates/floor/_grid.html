@@ -30,6 +30,9 @@
     </div>
   </div>
   {% empty %}
-  <p class="board-empty">暂无灶台，请先种子数据</p>
+  <p class="board-empty">暂无符合该相位的灶台</p>
   {% endfor %}
 </div>
+{% if include_oob_legend %}
+{% include "floor/_legend.html" with legend_oob=True %}
+{% endif %}

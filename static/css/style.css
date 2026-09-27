@@ -303,6 +303,8 @@ body {
 .leg.phase-holding i { background: var(--holding); }
 .leg.phase-drawing i { background: var(--drawing); }
 
+.leg.on { outline: 1px solid currentColor; outline-offset: 2px; border-radius: 2px; }
+
 .floor-grid {
   display: flex;
   flex-direction: column;
